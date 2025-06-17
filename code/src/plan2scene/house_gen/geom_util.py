@@ -3,45 +3,102 @@ import numpy as np
 
 from arch_parser.models.room import Room
 from arch_parser.models.wall_room_assignment import WallRoomAssignment
+from shapely.geometry import GeometryCollection, LineString, Point, MultiPoint
 
+# def ray_test(mask, ray_origin: tuple, ray_direction: tuple, ray_length: float) -> tuple:
+#     """
+#     Perform a ray-hit-test on the top-down view of the house geometry.
+#     :param mask: Top down view mask of walls
+#     :param ray_origin: Ray start point
+#     :param ray_direction: Ray direction
+#     :param ray_length: Maximum length of ray
+#     :return: Tuple (min_distance, hit point)
+#     """
+#     assert len(ray_origin) == 2
+#     assert len(ray_direction) == 2
+#     from shapely.geometry import GeometryCollection, LineString, Point, MultiPoint
+#     ray = [ray_origin, (ray_origin[0] + ray_direction[0] * ray_length, ray_origin[1] + ray_direction[1] * ray_length)]
+#
+#     ray_segment = LineString(ray)
+#     ray_intersection = ray_segment.intersection(mask)
+#
+#     intersection_point = None
+#     min_distance = ray_length
+#
+#     hit_points = []
+#     if isinstance(ray_intersection, GeometryCollection):
+#         if not ray_intersection.is_empty:
+#             for g in ray_intersection.geoms:
+#                 # hit_points.extend([(r.x, r.y) for r in g.boundary])
+#                 geoms = g.geoms if hasattr(g, "geoms") else [g]
+#                 hit_points.extend([(pt.x, pt.y) for pt in geoms])
+#     else:
+#         if not ray_intersection.is_empty:
+#             # hit_points = [(r.x, r.y) for r in ray_intersection.boundary]
+#             from shapely.geometry import MultiPoint, Point
+#             if isinstance(ray_intersection, MultiPoint):
+#                 # 여러 교차점이 있을 때
+#                 hit_points = [(pt.x, pt.y) for pt in ray_intersection.geoms]
+#             elif isinstance(ray_intersection, Point):
+#                 # 단일 교차점
+#                 hit_points = [(ray_intersection.x, ray_intersection.y)]
+#             else:
+#                 # 그 외 GeometryCollection 등일 경우
+#                 try:
+#                     hit_points = [(pt.x, pt.y) for pt in ray_intersection.geoms]
+#                 except Exception:
+#                     hit_points = []
+#
+#     for hit_point in hit_points:
+#         d = math.sqrt((hit_point[0] - ray_origin[0]) ** 2 + (hit_point[1] - ray_origin[1]) ** 2)
+#         if min_distance is None or d < min_distance:
+#             min_distance = d
+#             intersection_point = hit_point
+#
+#     return min_distance, intersection_point
 
 def ray_test(mask, ray_origin: tuple, ray_direction: tuple, ray_length: float) -> tuple:
     """
     Perform a ray-hit-test on the top-down view of the house geometry.
     :param mask: Top down view mask of walls
-    :param ray_origin: Ray start point
-    :param ray_direction: Ray direction
+    :param ray_origin: Ray start point (x, y)
+    :param ray_direction: Ray direction vector (dx, dy)
     :param ray_length: Maximum length of ray
-    :return: Tuple (min_distance, hit point)
+    :return: Tuple (min_distance, hit_point) where hit_point is (x, y) or None
     """
-    assert len(ray_origin) == 2
-    assert len(ray_direction) == 2
-    from shapely.geometry import GeometryCollection, LineString
-    ray = [ray_origin, (ray_origin[0] + ray_direction[0] * ray_length, ray_origin[1] + ray_direction[1] * ray_length)]
+    assert len(ray_origin) == 2 and len(ray_direction) == 2
 
-    ray_segment = LineString(ray)
-    ray_intersection = ray_segment.intersection(mask)
+    # 1) Ray segment 생성
+    ray_end = (
+        ray_origin[0] + ray_direction[0] * ray_length,
+        ray_origin[1] + ray_direction[1] * ray_length
+    )
+    ray_segment = LineString([ray_origin, ray_end])
 
-    intersection_point = None
-    min_distance = ray_length
+    # 2) Ray와 mask 교차
+    intersection = ray_segment.intersection(mask)
 
+    # 3) 모든 교차점 수집
     hit_points = []
-    if isinstance(ray_intersection, GeometryCollection):
-        if not ray_intersection.is_empty:
-            for g in ray_intersection.geoms:
-                hit_points.extend([(r.x, r.y) for r in g.boundary])
-    else:
-        if not ray_intersection.is_empty:
-            hit_points = [(r.x, r.y) for r in ray_intersection.boundary]
+    elements = intersection.geoms if hasattr(intersection, "geoms") else [intersection]
+    for geom in elements:
+        sub_geoms = geom.geoms if hasattr(geom, "geoms") else [geom]
+        for pt in sub_geoms:
+            if isinstance(pt, Point):
+                hit_points.append((pt.x, pt.y))
 
-    for hit_point in hit_points:
-        d = math.sqrt((hit_point[0] - ray_origin[0]) ** 2 + (hit_point[1] - ray_origin[1]) ** 2)
-        if min_distance is None or d < min_distance:
-            min_distance = d
-            intersection_point = hit_point
+    # 4) 최소 거리 계산
+    min_distance = ray_length
+    intersection_point = None
+    for x, y in hit_points:
+        dx = x - ray_origin[0]
+        dy = y - ray_origin[1]
+        dist = math.hypot(dx, dy)
+        if dist < min_distance:
+            min_distance = dist
+            intersection_point = (x, y)
 
     return min_distance, intersection_point
-
 
 def get_room_mask(room: Room):
     """
@@ -73,7 +130,8 @@ def get_room_mask(room: Room):
 
         all_lines.append(ls)
 
-    from shapely.ops import cascaded_union
+    # from shapely.ops import cascaded_union
+    from shapely.ops import unary_union as cascaded_union
     u = cascaded_union(all_lines)
     return u
 
@@ -92,7 +150,13 @@ def get_transform(x: float, y: float, z: float, angle: float, scale_x: float = 1
     from scipy.spatial.transform import Rotation as R
     scale_mat = np.array([[scale_x, 0, 0, 0], [0, 1, 0, 0], [0, 0, scale_z, 0], [0, 0, 0, 1]], dtype=float)
     r = R.from_rotvec((0, angle / 180 * np.pi, 0))
-    m = r.as_dcm()
+    # m = r.as_dcm()
+    try:
+        # 구 버전 호환
+        m = r.as_dcm()
+    except AttributeError:
+        # 최신 SciPy
+        m = r.as_matrix()
     m = np.vstack([m, [x, y, z]])
     m = np.hstack([m, np.transpose(np.array([[0, 0, 0, 1]]))])
     m = np.matmul(scale_mat, m)

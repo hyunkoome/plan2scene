@@ -1,5 +1,16 @@
 # Plan2Scene
 
+```shell
+pip install torch==2.6.0 torchvision==0.21.0 torchaudio==2.6.0 --index-url https://download.pytorch.org/whl/cu126
+pip install -r code/requirements.txt 
+cd code/src/plan2scene/texture_gen/custom_ops/noise_kernel/
+#pip install .
+TORCH_CUDA_ARCH_LIST="8.9" pip install .
+
+mkdir data & cd data
+```
+
+
 Official repository of the paper:
 
 __Plan2Scene: Converting floorplans to 3D scenes__
@@ -94,6 +105,9 @@ Pretrained models are available [here](./docs/md/pretrained_models.md).
     - Run the following command to generate previews.
        ```bash
        CUDA_VISIBLE_DEVICES=0 python code/scripts/plan2scene/render_house_jsons.py ./data/processed/gnn_prop/test/drop_0.0/archs --scene-json
+      python code/scripts/plan2scene/render_house_jsons.py ./data/processed/gnn_prop/test/drop_0.0/archs --scene-json
+      
+      python code/scripts/plan2scene/render_house_jsons2.py ./data/processed/gnn_prop/test/drop_0.0/archs --scene-json
        # A .png file is created for each .scene.json file in the ./data/processed/gnn_prop/test/drop_0.0/archs directory.
        ```
 5) Generate qualitative result pages with previews using [preview_houses.py](code/scripts/plan2scene/preview_houses.py).

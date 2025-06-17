@@ -123,7 +123,6 @@ __global__ void noise_cuda_forward_kernel(
     }
 }
 
-/*
 torch::Tensor noise_cuda_forward(
     torch::Tensor position,
     torch::Tensor seed) {
@@ -131,10 +130,8 @@ torch::Tensor noise_cuda_forward(
     const auto batch_size = position.size(0);
     const int dim = position.size(1);
 
-    // auto options = torch::TensorOptions().dtype(position.scalar_type().scalarType()).device(torch::kCUDA);
-
-    // at::ScalarType 을 바로 넣고, 디바이스도 원본 tensor 로부터 물려받습니다.
-   auto options = torch::TensorOptions().dtype(position.scalar_type()).device(position.device());
+    // auto options = torch::TensorOptions().dtype(position.type().scalarType()).device(torch::kCUDA);
+    auto options = torch::TensorOptions().dtype(position.scalar_type().scalarType()).device(torch::kCUDA);
 
     auto nearest_noise = torch::zeros({batch_size}, options);
     auto bilinear_noise = torch::zeros({batch_size}, options);
@@ -142,63 +139,18 @@ torch::Tensor noise_cuda_forward(
     const int threads = 512;
     const dim3 blocks((batch_size / threads)+1);
 
-    AT_DISPATCH_FLOATING_TYPES(position.scalar_type(), "noise_cuda_forward_kernel", [&] {
+    // AT_DISPATCH_FLOATING_TYPES(position.type(), "noise_cuda_forward_kernel", ([&] {
+    AT_DISPATCH_FLOATING_TYPES(position.scalar_type(), "noise_cuda_forward_kernel", ([&] {
         noise_cuda_forward_kernel<scalar_t><<<blocks, threads>>>(
-            position.packed_accessor<scalar_t,2,at::RestrictPtrTraits,size_t>(),
-            nearest_noise.packed_accessor<scalar_t,1,at::RestrictPtrTraits,size_t>(),
-            bilinear_noise.packed_accessor<scalar_t,1,at::RestrictPtrTraits,size_t>(),
+            position.packed_accessor<scalar_t,2,torch::RestrictPtrTraits,size_t>(),
+            nearest_noise.packed_accessor<scalar_t,1,torch::RestrictPtrTraits,size_t>(),
+            bilinear_noise.packed_accessor<scalar_t,1,torch::RestrictPtrTraits,size_t>(),
             batch_size,
             dim,
-            seed.packed_accessor<scalar_t,1,at::RestrictPtrTraits,size_t>()
+            seed.packed_accessor<scalar_t,1,torch::RestrictPtrTraits,size_t>()
         );
     }));
 
-    return torch::stack({nearest_noise, bilinear_noise}, 0);
-}
-*/
-
-/*
-torch::Tensor noise_cuda_forward(
-    const at::Tensor& position,
-    const at::Tensor& seed
-) { */
-torch::Tensor noise_cuda_forward(torch::Tensor position, torch::Tensor seed) {
-    const int64_t batch_size = position.size(0);
-    const int64_t dim        = position.size(1);
-
-    // TensorOptions 고치신 대로
-    auto options = torch::TensorOptions()
-                       .dtype(position.scalar_type())
-                       .device(position.device());
-
-    // 결과를 담을 텐서들
-    at::Tensor nearest_noise  = torch::empty({batch_size}, options);
-    at::Tensor bilinear_noise = torch::empty({batch_size}, options);
-
-    const int threads = 512;
-    // 올림(ceil) 계산: batch_size가 threads의 배수일 때도 딱 나누어 줌
-    const int num_blocks = (batch_size + threads - 1) / threads;
-    // 1D 그리드라면 int로 선언해도 되고, dim3로 써도 무방합니다:
-    const dim3 blocks(num_blocks);
-
-    // --- 여기서! lambda를 괄호로 감싸지 말고,
-    //     마지막 세미콜론도 함수 밖으로 빼서 매크로가 잘 종료되게 합니다.
-    AT_DISPATCH_FLOATING_TYPES(
-        position.scalar_type(),
-        "noise_cuda_forward_kernel",
-        [&] {
-            noise_cuda_forward_kernel<scalar_t><<<blocks, threads>>>(
-                position.packed_accessor<scalar_t,2,at::RestrictPtrTraits,size_t>(),
-                nearest_noise.packed_accessor<scalar_t,1,at::RestrictPtrTraits,size_t>(),
-                bilinear_noise.packed_accessor<scalar_t,1,at::RestrictPtrTraits,size_t>(),
-                batch_size,
-                dim,
-                seed.packed_accessor<scalar_t,1,at::RestrictPtrTraits,size_t>()
-            );
-        }
-    );  // ← 여기 세미콜론
-
-    // 커널 디스패치가 끝난 후에야 return
     return torch::stack({nearest_noise, bilinear_noise}, 0);
 }
 
@@ -280,7 +232,7 @@ __global__ void noise_cuda_backward_kernel(
     }
 }
 
-/*
+
 torch::Tensor noise_cuda_backward(torch::Tensor position, torch::Tensor seed) {
     const auto batch_size = position.size(0);
     const int dim = position.size(1);
@@ -290,54 +242,16 @@ torch::Tensor noise_cuda_backward(torch::Tensor position, torch::Tensor seed) {
 
     auto d_position = torch::zeros_like(position);
 
-    AT_DISPATCH_FLOATING_TYPES(d_position.scalar_type(), "noise_cuda_backward_kernel", [&] {
+    // AT_DISPATCH_FLOATING_TYPES(d_position.type(), "noise_cuda_backward_kernel", ([&] {
+    AT_DISPATCH_FLOATING_TYPES(d_position.scalar_type(), "noise_cuda_backward_kernel", ([&] {
         noise_cuda_backward_kernel<scalar_t><<<blocks, threads>>>(
-            position.packed_accessor<scalar_t,2,at::RestrictPtrTraits,size_t>(),
-            seed.packed_accessor<scalar_t,1,at::RestrictPtrTraits,size_t>(),
-            d_position.packed_accessor<scalar_t,2,at::RestrictPtrTraits,size_t>(),
+            position.packed_accessor<scalar_t,2,torch::RestrictPtrTraits,size_t>(),
+            seed.packed_accessor<scalar_t,1,torch::RestrictPtrTraits,size_t>(),
+            d_position.packed_accessor<scalar_t,2,torch::RestrictPtrTraits,size_t>(),
             batch_size,
             dim
         );
     }));
-
-    return d_position;
-}
-*/
-/*
-torch::Tensor noise_cuda_backward(
-    const at::Tensor& position,
-    const at::Tensor& seed,
-    const at::Tensor& d_position
-) {*/
-torch::Tensor noise_cuda_backward(torch::Tensor position, torch::Tensor seed) {
-    const int64_t batch_size = position.size(0);
-    const int64_t dim        = position.size(1);
-
-//     const int threads = 512;
-//     const dim3 blocks((batch_size / threads)+1);
-    const int threads = 512;
-    // 올림(ceil) 계산: batch_size가 threads의 배수일 때도 딱 나누어 줌
-    const int num_blocks = (batch_size + threads - 1) / threads;
-    // 1D 그리드라면 int로 선언해도 되고, dim3로 써도 무방합니다:
-    const dim3 blocks(num_blocks);
-
-    // auto d_position = torch::zeros_like(position);
-
-    at::Tensor d_position = torch::empty_like(position);
-
-    AT_DISPATCH_FLOATING_TYPES(
-        d_position.scalar_type(),
-        "noise_cuda_backward_kernel",
-        [&] {
-            noise_cuda_backward_kernel<scalar_t><<<blocks, threads>>>(
-                position.packed_accessor<scalar_t,2,at::RestrictPtrTraits,size_t>(),
-                seed.packed_accessor<scalar_t,1,at::RestrictPtrTraits,size_t>(),
-                d_position.packed_accessor<scalar_t,2,at::RestrictPtrTraits,size_t>(),
-                batch_size,
-                dim
-            );
-        }
-    );  // ← 세미콜론
 
     return d_position;
 }

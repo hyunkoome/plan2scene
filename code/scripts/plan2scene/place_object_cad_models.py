@@ -425,14 +425,32 @@ if __name__ == "__main__":
         scene_json = serialize_scene_json(house, texture_both_sides_of_walls=not texture_internal_walls_only)
         place_object_models(house, object_annotations, scene_json, house_gen_conf=conf.house_gen)
 
+        # # Save
+        # save_file_name = None
+        # if house_file.endswith(".arch.json"):
+        #     save_file_name = osp.splitext(osp.splitext(house_file)[0])[0] + ".scene.json"
+        # elif house_file.endswith(".scene.json"):
+        #     save_file_name = house_file
+        # assert not osp.exists(osp.join(output_path, save_file_name)), "Output file already exists: {f}. Please delete it.".format(
+        #     f=osp.join(output_path, save_file_name))
+        # with open(osp.join(output_path, save_file_name), "w") as f:
+        #     json.dump(scene_json, f, indent=4)
+        # logging.info("Saved {file}".format(file=save_file_name))
+
         # Save
         save_file_name = None
         if house_file.endswith(".arch.json"):
             save_file_name = osp.splitext(osp.splitext(house_file)[0])[0] + ".scene.json"
         elif house_file.endswith(".scene.json"):
             save_file_name = house_file
-        assert not osp.exists(osp.join(output_path, save_file_name)), "Output file already exists: {f}. Please delete it.".format(
-            f=osp.join(output_path, save_file_name))
-        with open(osp.join(output_path, save_file_name), "w") as f:
+
+        file_path = osp.join(output_path, save_file_name)
+
+        # 기존 파일이 있으면 삭제
+        if os.path.exists(file_path):
+            os.remove(file_path)
+
+        # 새로 저장
+        with open(file_path, "w") as f:
             json.dump(scene_json, f, indent=4)
-        logging.info("Saved {file}".format(file=save_file_name))
+        logging.info(f"Saved {save_file_name}")

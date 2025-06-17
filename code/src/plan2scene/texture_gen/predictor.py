@@ -53,7 +53,9 @@ class TextureGenPredictor:
         Load saved checkpoint
         :param checkpoint_path: Path to checkpoint
         """
-        ckpt = torch.load(checkpoint_path)
+        # PyTorch2.6+ 에서 weights_only 기본이 True 이므로,
+        # 안전한 로컬 체크포인트라면 False 로 지정해서 모든 객체를 언피클링합니다.
+        ckpt = torch.load(checkpoint_path, weights_only=False)
         logging.info(
             "Loading Checkpoint %s: %s" % (checkpoint_path, self.net.load_state_dict(ckpt["model_state_dict"])))
 

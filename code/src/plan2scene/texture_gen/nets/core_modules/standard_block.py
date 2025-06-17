@@ -24,10 +24,23 @@ class StandardBlock(nn.Module):
             dropout = torch.nn.Dropout
             self.layer = layer(nf_in, nf_out, bias)
 
+        # elif type == 'conv_2d':
+        #     layer = torch.nn.Conv2d
+        #     dropout = torch.nn.Dropout2d
+        #     self.layer = layer(nf_in, nf_out, kernel_size, stride, padding, bias, padding_mode=padding_mode)
         elif type == 'conv_2d':
             layer = torch.nn.Conv2d
             dropout = torch.nn.Dropout2d
-            self.layer = layer(nf_in, nf_out, kernel_size, stride, padding, bias, padding_mode=padding_mode)
+            self.layer = layer(
+                in_channels=nf_in,
+                out_channels=nf_out,
+                kernel_size=kernel_size,
+                stride=stride,
+                padding=padding,
+                bias=bias,
+                padding_mode=padding_mode
+            )
+
 
         elif type == 'conv_transpose_2d':
             layer = torch.nn.ConvTranspose2d
